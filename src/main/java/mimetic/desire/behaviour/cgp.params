@@ -22,7 +22,7 @@ nostore = true
 pop.subpops = 1
 pop.subpop.0 = ec.Subpopulation
 
-pop.subpop.0.size = 50
+
 pop.subpop.0.species = ec.cgp.genome.CGPSpecies
 
 pop.subpop.0.species.ind = ec.cgp.genome.CGPIndividual
@@ -47,21 +47,7 @@ pop.subpop.0.species.fitness = ec.cgp.FitnessCGP
 pop.subpop.0.species.mutation-prob.0 = .2
 
 
-#================================================================================
-# Function lookup table class for use by the CGP function evaluator.
-# This class is expected to implement CGPFunctions.
-#================================================================================
-pop.subpop.0.species.function-set = cgp.functionsets.Arithmetic
 
-# number of nodes in CGP, not including inputs and outputs.
-pop.subpop.0.species.num-nodes = 10
-
-# number of input nodes in your CGP.  Your problem class feeds these inputs to the CGPInterpreter. 
-#one is for a constant
-pop.subpop.0.species.num-inputs = 2
-
-# number of output nodes in your CGP.  Your problem class extracts these outputs from the CGPInterpreter.
-pop.subpop.0.species.num-outputs = 1  
 
 
 #================================================================================
@@ -78,12 +64,7 @@ pop.subpop.0.species.pipe.source.0.source.0.size = 20
 pop.subpop.0.species.pipe.source.0.source.1 = ec.select.TournamentSelection
 pop.subpop.0.species.pipe.source.0.source.1.size = 20
 
-#================================================================================
-# Class that sets up the regression problem.  Invokes the CGPEvaluator on all
-# possible boolean inputs.  The CGPEvaluator computes the output value of the 
-# function represented by the genome.  
-#================================================================================
-eval.problem = cgp.problems.Regression
+
 
 
 #================================================================================

@@ -50,12 +50,15 @@ public class Agent implements Steppable {
 		this.fitnessLandscape = f;
 		this.index = i;
 		this.steps = 0;
+
 		this.behaviour = new EvoBehaviour();
+		behaviour.setup(this, model);
+
 		model.space.setObjectLocation(this, new Double2D(position));
 	}
 
 	private void stepBehaviour(EvoBehaviour evoBehaviour, MimeticDesire model) {
-		evoBehaviour.update(this, model);
+		evoBehaviour.update();
 	}
 
 	@Override

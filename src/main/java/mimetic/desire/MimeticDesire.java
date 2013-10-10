@@ -209,7 +209,7 @@ public class MimeticDesire extends SimState {
 
 		double desiredx = position.x + velocity.x * velocityScalar;
 		double desiredy = position.y + velocity.y * velocityScalar;
-		System.out.println("desired -> (" + desiredx + "," + desiredy + ")");
+		// System.out.println("desired -> (" + desiredx + "," + desiredy + ")");
 
 		// toroidal world!
 		double x = space.stx(desiredx + width * 0.5) - (width * 0.5);
@@ -218,7 +218,7 @@ public class MimeticDesire extends SimState {
 		double y = space.sty(desiredy + height * 0.5) - (height * 0.5);
 		// (((desiredy - 0.5*width) + height)% height) - (height * 0.5);
 
-		System.out.println("new position -> (" + x + "," + y + ")");
+		// System.out.println("new position -> (" + x + "," + y + ")");
 
 		Double2D newPosition = new Double2D(x, y);
 		this.space.setObjectLocation(agent, newPosition);
