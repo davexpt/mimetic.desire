@@ -1,7 +1,7 @@
 package mimetic.desire;
 
 import mimetic.desire.behaviour.Behaviour;
-import mimetic.desire.behaviour.EvoBehaviour;
+import mimetic.desire.behaviour.FitnessBehaviour;
 import sim.app.pso.Evaluatable;
 import sim.engine.SimState;
 import sim.engine.Steppable;
@@ -18,11 +18,14 @@ public class Agent implements Steppable {
 	private MimeticDesire model;
 	private Evaluatable fitnessLandscape;
 
+	public MutableDouble2D bestFitnessP;
+	public double bestFitness = 0;
+
 	// steps executed by the agent
 	public int steps;
 
 	// evolutionary behaviour
-	EvoBehaviour behaviour;
+	FitnessBehaviour behaviour;
 
 	/**
 	 * 
@@ -50,20 +53,29 @@ public class Agent implements Steppable {
 		this.fitnessLandscape = f;
 		this.index = i;
 		this.steps = 0;
+		bestFitnessP = new MutableDouble2D(position);
 
-		this.behaviour = new EvoBehaviour();
+		this.behaviour = new FitnessBehaviour();
 		behaviour.setup(this, model);
 
 		model.space.setObjectLocation(this, new Double2D(position));
 	}
 
-	private void stepBehaviour(EvoBehaviour evoBehaviour, MimeticDesire model) {
+	private void stepBehaviour(FitnessBehaviour evoBehaviour, MimeticDesire model) {
 		evoBehaviour.update();
 	}
 
 	@Override
 	public void step(SimState state) {
 		stepBehaviour(behaviour, (MimeticDesire) state);
+
+		// update best fitness
+		double currentFitness = getFitness();
+		if (currentFitness > bestFitness) {
+			bestFitnessP = position;
+			bestFitness = currentFitness;
+		}
+
 		steps++;
 	}
 

@@ -2,7 +2,7 @@ package mimetic.desire.behaviour.ecg.problems;
 
 import mimetic.desire.Agent;
 import mimetic.desire.MimeticDesire;
-import mimetic.desire.behaviour.EvoBehaviour;
+import mimetic.desire.behaviour.FitnessBehaviour;
 import ec.EvolutionState;
 import ec.cgp.eval.CGPProblem;
 
@@ -24,7 +24,7 @@ public abstract class AbstractEvoBehaviourProblem extends CGPProblem implements
 	// was this problem setUp?
 	protected boolean setUp;
 
-	protected EvoBehaviour behaviour;
+	protected FitnessBehaviour behaviour;
 
 	public AbstractEvoBehaviourProblem() {
 		// nothing to do yet
@@ -34,7 +34,7 @@ public abstract class AbstractEvoBehaviourProblem extends CGPProblem implements
 
 	@Override
 	public void setup(Agent agent, MimeticDesire model,
-			EvoBehaviour evoBehaviour) {
+			FitnessBehaviour evoBehaviour) {
 		this.agent = agent;
 		this.model = model;
 		this.behaviour = evoBehaviour;

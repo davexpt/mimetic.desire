@@ -72,16 +72,7 @@ public class MimeticDesire extends SimState {
 
 	public double initialVelocityRange = 1.0;
 
-	public double getInitialVelocityRange() {
-		return initialVelocityRange;
-	}
-
-	public void setInitialVelocityRange(double val) {
-		if (val >= 0.0)
-			initialVelocityRange = val;
-	}
-
-	public double velocityScalar = 1;
+	public double velocityScalar = 0.5;
 
 	public double getVelocityScalar() {
 		return velocityScalar;
