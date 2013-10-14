@@ -13,7 +13,7 @@ pop.subpop.0.size = 20
 # possible boolean inputs.  The CGPEvaluator computes the output value of the 
 # function represented by the genome.  
 #================================================================================
-eval.problem = mimetic.desire.behaviour.ecj.problems.FitnessExploitation
+eval.problem = mimetic.desire.behaviour.ecj.problems.MimeticEvaluation
 
 
 
@@ -28,7 +28,7 @@ pop.subpop.0.species.num-nodes = 10
 
 # number of input nodes in your CGP.  Your problem class feeds these inputs to the CGPInterpreter. 
 #one is for a constant
-pop.subpop.0.species.num-inputs = 7
+pop.subpop.0.species.num-inputs = 6
 
 # number of output nodes in your CGP.  Your problem class extracts these outputs from the CGPInterpreter.
 pop.subpop.0.species.num-outputs = 2

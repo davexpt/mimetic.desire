@@ -1,4 +1,4 @@
-package mimetic.desire.behaviour.ecg.functions;
+package mimetic.desire.behaviour.ecj.functions;
 
 import java.util.HashSet;
 import java.util.Set;

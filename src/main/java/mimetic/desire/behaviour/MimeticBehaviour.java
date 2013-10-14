@@ -10,25 +10,21 @@ import javax.management.RuntimeErrorException;
 import org.apache.commons.math3.analysis.function.Sigmoid;
 import org.apache.commons.math3.util.FastMath;
 
-import com.sun.xml.internal.ws.policy.spi.PolicyAssertionValidator.Fitness;
-
-import sim.app.pacman.Energizer;
 import sim.util.Double2D;
 import ec.EvolutionState;
 import ec.Evolve;
 import ec.Individual;
 import ec.cgp.eval.CGPSteppableInterpreter;
-import ec.cgp.functions.numeric.SigmoidFn;
 import ec.cgp.genome.CGPIndividual;
-import ec.simple.SimpleStatistics;
 import ec.util.Output;
 import ec.util.ParameterDatabase;
 import mimetic.desire.Agent;
 import mimetic.desire.MimeticDesire;
-import mimetic.desire.behaviour.ecj.problems.EvoBehaviourProblem;
-import mimetic.desire.behaviour.ecj.problems.FitnessExploitation;
+import mimetic.desire.behaviour.ecj.problems.MimeticEvaluation;
 
-public class FitnessBehaviour extends AbstractBehaviour {
+//TODO this is a rough copy of fitenss behaviour
+//the fitness is how well we are imitation a neighbour rather than the fitness landscape
+public class MimeticBehaviour extends AbstractBehaviour {
 
 	private final double[] constants = new double[] { 1.0, -1.0 };
 
@@ -41,16 +37,18 @@ public class FitnessBehaviour extends AbstractBehaviour {
 	private static final int INITIAL_UTILITY = 10;
 	private double utility = 30;
 	private double utilityUpdateSpeed = 1.0;
-	private double minimalProgress = 1.0;
+	private double imitationErrorThreshold = 0.1;
+
+	private Agent mediator = null;
 
 	// the current controller program that is used to update the agent
 	private CGPIndividual pController;
 	private CGPSteppableInterpreter interpreter;
 
-	private Map<Individual, ArrayList<Double>> fitnessRecords;
+	private Map<Individual, ArrayList<Double2D>> imitationErrors;
 	private Map<Individual, ArrayList<Double>> fitnessProgressionRecords;
 
-	public FitnessBehaviour() {
+	public MimeticBehaviour() {
 		super();
 
 	}
@@ -67,25 +65,29 @@ public class FitnessBehaviour extends AbstractBehaviour {
 			throw new RuntimeException(
 					"you called update on the behaviour without initialising its evolutionary state");
 		else {
-
+			// select random mediator
+			if (mediator == null) {
+				Agent[] neighbours = model.getNeighobours(agent.index, null);
+				mediator = neighbours[model.random.nextInt(neighbours.length)];
+			}
 			int numControllers = fEvoState.population.subpops[0].individuals.length;
 			/*************************************************
 			 * continue executing the controllers
 			 *************************************************/
 			// a controller has maturated, update utility
 			if (agent.steps > 0 && agent.steps % (maturationSteps) == 0) {
-				double progress = fitnessProgression(pController);
+				double imitationError = currentImitationError(pController);
 
-//				fEvoState.output
-//						.message("controller evaluated, computing progression: "
-//								+ progress);
+				// fEvoState.output
+				// .message("controller evaluated, computing progression: "
+				// + progress);
 
 				// update utility
 				this.utility = utility
-						+ (FastMath.abs(progress) >= minimalProgress ? progress
-								* utilityUpdateSpeed : -1 * utilityUpdateSpeed);
+						+ (FastMath.abs(imitationError) >= imitationError ? -1
+								* utilityUpdateSpeed : utilityUpdateSpeed);
 
-//				fEvoState.output.message("current utility: " + utility);
+				// fEvoState.output.message("current utility: " + utility);
 
 				// current utility reached 0, switch controller
 				if (utility <= 0) {
@@ -100,7 +102,7 @@ public class FitnessBehaviour extends AbstractBehaviour {
 			 *************************************************/
 
 			if (numEvaluated == numControllers) {
-				FitnessExploitation problem = (FitnessExploitation) fEvoState.evaluator.p_problem;
+				MimeticEvaluation problem = (MimeticEvaluation) fEvoState.evaluator.p_problem;
 				// usually it is not, the first time
 				if (!problem.isSetup()) {
 					problem.setup(agent, model, this);
@@ -111,13 +113,13 @@ public class FitnessBehaviour extends AbstractBehaviour {
 				// lets erase the fitness records and record new ones for the
 				// new
 				// generation of controllers
-				resetFitnessRecords();
+				resetImitationErrors();
 
 				numEvaluated = 0;
 			}
 
-//			fEvoState.output.message("evaluating individual: "
-//					+ currentController);
+			// fEvoState.output.message("evaluating individual: "
+			// + currentController);
 
 			pController = (CGPIndividual) fEvoState.population.subpops[0].individuals[currentController];
 
@@ -141,12 +143,12 @@ public class FitnessBehaviour extends AbstractBehaviour {
 			double scaledY = scale(position.y, model.space.height * -0.5,
 					model.space.height * 0.5);
 
-//			Object[] inputs = new Object[] { scaledX, velocity.x, scaledY,
-//					velocity.y, scaleFitness(currentFitness),
-//					scaleFitness(previousFitness), constants[0], constants[1] };
-			
+			// Object[] inputs = new Object[] { scaledX, velocity.x, scaledY,
+			// velocity.y, scaleFitness(currentFitness),
+			// scaleFitness(previousFitness), constants[0], constants[1] };
+
 			Object[] inputs = new Object[] { scaledX, velocity.x, scaledY,
-					velocity.y, scaleFitness(currentFitness), constants[0], constants[1] };
+					velocity.y, constants[0], constants[1] };
 
 			// update last fitness to current fitness
 			previousFitness = currentFitness;
@@ -168,52 +170,27 @@ public class FitnessBehaviour extends AbstractBehaviour {
 			agent.setVelocity(newVelocity);
 			agent.updatePosition();
 
-//			fEvoState.output.message("executed controller: "
-//					+ interpreter.getExpression());
+			// fEvoState.output.message("executed controller: "
+			// + interpreter.getExpression());
 
-			recordFitness();
+			recordImitationError();
 
 		}
 
 	}
 
-	private double fitnessProgression(CGPIndividual controller) {
-		ArrayList<Double> fitnessR = fitnessRecords.get(controller);
-		if (!fitnessProgressionRecords.containsKey(controller)) {
-			fitnessProgressionRecords.put(controller, new ArrayList<Double>());
+	public double currentImitationError(CGPIndividual controller) {
+		ArrayList<Double2D> imitationErrorR = imitationErrors.get(controller);
+
+		double imitationError = 0.0;
+
+		for (Double2D vErrors : imitationErrorR) {
+			imitationError += FastMath.abs(vErrors.x) + FastMath.abs(vErrors.y);
 		}
-		ArrayList<Double> fitnessProgR = fitnessProgressionRecords
-				.get(controller);
+		// mean for the observations
+		imitationError /= imitationErrorR.size();
 
-		double avgFitness = 0.0;
-
-		for (int i = 0; i < maturationSteps; i++) {
-			int index = fitnessR.size() - 1 - i;
-			avgFitness += fitnessR.get(index);
-		}
-		avgFitness /= maturationSteps;
-
-		double avgPrevFitness = 0.0;
-		// first time this is called
-		if (fitnessR.size() == maturationSteps) {
-			avgPrevFitness = this.firstFitness;
-		} else {
-			for (int i = 0; i < maturationSteps; i++) {
-				int index = fitnessR.size() - 1 - maturationSteps - i;
-				avgPrevFitness += fitnessR.get(index);
-			}
-			avgPrevFitness /= maturationSteps;
-		}
-
-		double fitnessProgression = 0;
-		if (avgPrevFitness == 0)
-			return avgFitness;
-
-		fitnessProgression = (avgFitness - avgPrevFitness)
-				/ FastMath.abs(avgPrevFitness);
-
-		fitnessProgR.add(fitnessProgression);
-		return fitnessProgression;
+		return imitationError;
 	}
 
 	/**
@@ -221,19 +198,27 @@ public class FitnessBehaviour extends AbstractBehaviour {
 	 * its position) so that we record its current fitness and relate it with
 	 * the individual controller program behing evaluated
 	 */
-	private void recordFitness() {
-		if (fitnessRecords == null) {
+	private void recordImitationError() {
+		if (imitationErrors == null) {
 			throw new RuntimeException(
 					"Fitness Records were not initialised for this behaviour, we cant record");
 		} else {
 
-			if (!fitnessRecords.containsKey(pController)) {
-				fitnessRecords.put(pController, new ArrayList<Double>());
+			if (!imitationErrors.containsKey(pController)) {
+				imitationErrors.put(pController, new ArrayList<Double2D>());
 			}
-			ArrayList<Double> fitnessRecord = fitnessRecords.get(pController);
-			double currentFitness = agent.getFitness();
+			ArrayList<Double2D> errorRecord = imitationErrors.get(pController);
 
-			fitnessRecord.add(Math.pow((currentFitness - previousFitness), 2));
+			Double2D dxdy = agent.getVelocity();
+			Double2D dxdyMediator = mediator.getVelocity();
+
+			double xError = FastMath.abs(dxdy.x - dxdyMediator.x);
+			double yError = FastMath.abs(dxdy.y - dxdyMediator.y);
+
+			xError = (dxdy.x < dxdyMediator.x) ? xError * -1 : xError;
+			yError = (dxdy.y < dxdyMediator.y) ? xError * -1 : yError;
+
+			errorRecord.add(new Double2D(xError, yError));
 		}
 	}
 
@@ -249,7 +234,7 @@ public class FitnessBehaviour extends AbstractBehaviour {
 
 		File parameterFile = new File(Thread.currentThread()
 				.getContextClassLoader()
-				.getResource("fitness_exploitation.params").getPath()
+				.getResource("mimetic_behaviour.params").getPath()
 				.toString());
 
 		ParameterDatabase dbase = null;
@@ -264,12 +249,11 @@ public class FitnessBehaviour extends AbstractBehaviour {
 		}
 
 		Output out = Evolve.buildOutput();
-		
 
 		fEvoState = Evolve.initialize(dbase, 0, out);
 		interpreter = new CGPSteppableInterpreter();
 
-		resetFitnessRecords();
+		resetImitationErrors();
 		firstFitness = agent.getFitness();
 		fEvoState.startFresh();
 
@@ -287,40 +271,28 @@ public class FitnessBehaviour extends AbstractBehaviour {
 		// evaluatedState.output.message(interpreter.getExpression());
 	}
 
-	private void resetFitnessRecords() {
-		fitnessRecords = new HashMap<Individual, ArrayList<Double>>();
+	private void resetImitationErrors() {
+		imitationErrors = new HashMap<Individual, ArrayList<Double2D>>();
 		fitnessProgressionRecords = new HashMap<Individual, ArrayList<Double>>();
 
 	}
 
-	public ArrayList<Double> getFitnessRecord(CGPIndividual ind) {
-		return fitnessRecords.get(ind);
+	public ArrayList<Double2D> getImitationErrors(CGPIndividual ind) {
+		return imitationErrors.get(ind);
 	}
 
 	// min / max fitenss
-	private double minFitness = 0.0;
-	private double maxFitness = 0.0;
+	private static final double MIN_ERROR = -4.0;
+	private static final double MAX_ERROR = 4.0;
 
-	private double scaleFitness(double fitness) {
-		double result = 0;
-		if (agent.steps == 0) {
-			minFitness = fitness;
-			maxFitness = fitness;
-		} else {
+	
+	public double scaleError(double error) {
 
-			// found a new max
-			if (fitness > maxFitness) {
-				maxFitness = fitness;
-			} else if (fitness < minFitness) {
-				minFitness = fitness;
-			}
+		return scale(error, MIN_ERROR, MAX_ERROR);
 
-			// rescale
-			result = scale(fitness, minFitness, maxFitness);
-		}
-		return result;
 	}
 
+	// this should be located in an Util class or something
 	private double scale(double value, double min, double max) {
 		if (min == max)
 			return 0;
@@ -332,4 +304,5 @@ public class FitnessBehaviour extends AbstractBehaviour {
 	public ArrayList<Double> getFitnessProgressionRecords(CGPIndividual ind) {
 		return fitnessProgressionRecords.get(ind);
 	}
+
 }
