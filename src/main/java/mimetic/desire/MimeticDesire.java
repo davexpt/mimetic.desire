@@ -3,6 +3,7 @@ package mimetic.desire;
 import sim.app.pso.Booth;
 import sim.app.pso.Evaluatable;
 import sim.app.pso.Griewangk;
+import sim.app.pso.Particle;
 import sim.app.pso.Rastrigin;
 import sim.app.pso.Rosenbrock;
 import sim.engine.Schedule;
@@ -153,11 +154,18 @@ public class MimeticDesire extends SimState {
 
 	int prevSuccessCount = -1;
 
+	public double bestVal;
+
+	public MutableDouble2D bestPosition = new MutableDouble2D();
+
 	public void start() {
 		// reset the global best
 		// bestVal = 0;
 
 		super.start();
+
+		if (agents != null)
+			cleanAgents();
 		agents = new Agent[numAgents];
 		space = new Continuous2D(height, width, height);
 
@@ -218,5 +226,43 @@ public class MimeticDesire extends SimState {
 		// "resistance"
 		agent.setVelocity(velocity);
 		return newPosition;
+
 	}
+
+	public void updateBest(double currVal, double currX, double currY) {
+		if (currVal > bestVal) {
+			bestVal = currVal;
+			bestPosition.setTo(currX, currY);
+		}
+	}
+
+	public double getNeighborhoodBest(int agentIndex, MutableDouble2D pos) {
+		double bv = Double.NEGATIVE_INFINITY;
+		Agent a;
+
+		Agent[] neighbours = getNeighobours(agentIndex, pos);
+
+		for (Agent neighbour : neighbours) {
+
+			if (neighbour.bestFitness > bv) {
+				bv = neighbour.bestFitness;
+				pos.setTo(neighbour.bestPosition);
+			}
+		}
+
+		return 1.0;
+	}
+
+	@Override
+	public void finish() {
+		super.finish();
+
+	}
+
+	private void cleanAgents() {
+		for (Agent agent : agents) {
+			agent.finish();
+		}
+	}
+
 }

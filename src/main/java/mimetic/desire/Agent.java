@@ -3,6 +3,8 @@ package mimetic.desire;
 import mimetic.desire.behaviour.Behaviour;
 import mimetic.desire.behaviour.FitnessBehaviour;
 import mimetic.desire.behaviour.MimeticBehaviour;
+import mimetic.desire.behaviour.PSOBehaviour;
+import mimetic.desire.behaviour.ecj.problems.FitnessExploitation;
 import sim.app.pso.Evaluatable;
 import sim.engine.SimState;
 import sim.engine.Steppable;
@@ -20,13 +22,19 @@ public class Agent implements Steppable {
 	private Evaluatable fitnessLandscape;
 
 	public MutableDouble2D bestFitnessP;
-	public double bestFitness = 0;
+	public double bestFitness;
 
 	// steps executed by the agent
 	public int steps;
 
 	// evolutionary behaviour
 	Behaviour behaviour;
+
+	Behaviour adhoc;
+
+	Behaviour fitnessExploit;
+
+	public int evaluationPeriod = 10;
 
 	/**
 	 * 
@@ -54,32 +62,56 @@ public class Agent implements Steppable {
 		this.fitnessLandscape = f;
 		this.index = i;
 		this.steps = 0;
+
 		bestFitnessP = new MutableDouble2D(position);
+		this.bestFitness = this.getFitness();
 
 		// this.behaviour = new FitnessBehaviour();
+		// this.behaviour = new MimeticBehaviour();
 		this.behaviour = new MimeticBehaviour();
 		behaviour.setup(this, model);
+
+		this.fitnessExploit = new FitnessBehaviour();
+		fitnessExploit.setup(this, model);
+
+		this.adhoc = new PSOBehaviour();
+		this.adhoc.setup(this, model);
+
+		currentBehaviour = behaviour;
 
 		model.space.setObjectLocation(this, new Double2D(position));
 	}
 
-	private void stepBehaviour(Behaviour evoBehaviour,
-			MimeticDesire model) {
+	private void stepBehaviour(Behaviour evoBehaviour, MimeticDesire model) {
 		evoBehaviour.update();
 	}
 
+	public double adhocProb = 0.6;
+	public double fitnessExploitProb = 0.0;
+
+	Behaviour currentBehaviour = null;
+
 	@Override
 	public void step(SimState state) {
-		stepBehaviour(behaviour, (MimeticDesire) state);
+
+		stepBehaviour(currentBehaviour, model);
 
 		// update best fitness
-		double currentFitness = getFitness();
-		if (currentFitness > bestFitness) {
-			bestFitnessP = position;
-			bestFitness = currentFitness;
-		}
+		updateBest(getFitness(), position.x, position.y);
 
 		steps++;
+
+		if (steps > 0 && steps % evaluationPeriod == 0) {
+
+			double random = model.random.nextDouble();
+			if (random < fitnessExploitProb) {
+				currentBehaviour = fitnessExploit;
+
+			} else {
+				currentBehaviour = behaviour;
+			}
+		}
+
 	}
 
 	// get a fitness based on the fitness landscape the agent is considering
@@ -125,6 +157,25 @@ public class Agent implements Steppable {
 		Double2D newPosition = model.updatePosition(this, getPosition(),
 				getVelocity());
 		this.position.setTo(newPosition);
+	}
+
+	/**
+	 * If there's some component on the agent that needs to be terminated (files
+	 * to be closed, etc) this is the method called. The Mimetic Desire model
+	 * calles this on every agent before terminating.
+	 */
+	public void finish() {
+		this.behaviour.finish();
+
+	}
+
+	public void updateBest(double currVal, double currX, double currY) {
+		if (currVal > this.bestFitness) {
+			bestFitness = currVal;
+			bestFitnessP.setTo(currX, currY);
+
+			model.updateBest(currVal, currX, currY);
+		}
 	}
 
 }

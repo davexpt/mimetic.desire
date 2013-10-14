@@ -7,4 +7,6 @@ public interface Behaviour {
 	void update();
 
 	void setup(Agent agent, MimeticDesire model);
+
+	void finish();
 }

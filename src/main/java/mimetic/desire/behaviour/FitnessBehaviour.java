@@ -60,6 +60,7 @@ public class FitnessBehaviour extends AbstractBehaviour {
 	private int numEvaluated = 0;
 	private int currentController = 0;
 	private double firstFitness = 0;
+	private int steps = 0;
 
 	@Override
 	public void update() {
@@ -73,19 +74,19 @@ public class FitnessBehaviour extends AbstractBehaviour {
 			 * continue executing the controllers
 			 *************************************************/
 			// a controller has maturated, update utility
-			if (agent.steps > 0 && agent.steps % (maturationSteps) == 0) {
+			if (steps > 0 && steps % (maturationSteps) == 0) {
 				double progress = fitnessProgression(pController);
 
-//				fEvoState.output
-//						.message("controller evaluated, computing progression: "
-//								+ progress);
+				// fEvoState.output
+				// .message("controller evaluated, computing progression: "
+				// + progress);
 
 				// update utility
 				this.utility = utility
 						+ (FastMath.abs(progress) >= minimalProgress ? progress
 								* utilityUpdateSpeed : -1 * utilityUpdateSpeed);
 
-//				fEvoState.output.message("current utility: " + utility);
+				// fEvoState.output.message("current utility: " + utility);
 
 				// current utility reached 0, switch controller
 				if (utility <= 0) {
@@ -116,8 +117,8 @@ public class FitnessBehaviour extends AbstractBehaviour {
 				numEvaluated = 0;
 			}
 
-//			fEvoState.output.message("evaluating individual: "
-//					+ currentController);
+			// fEvoState.output.message("evaluating individual: "
+			// + currentController);
 
 			pController = (CGPIndividual) fEvoState.population.subpops[0].individuals[currentController];
 
@@ -132,7 +133,7 @@ public class FitnessBehaviour extends AbstractBehaviour {
 			double currentFitness = agent.getFitness();
 
 			// in the beginning we dont have historic data about fitness
-			if (agent.steps == 0) {
+			if (steps == 0) {
 				previousFitness = agent.getFitness();
 			}
 
@@ -141,12 +142,13 @@ public class FitnessBehaviour extends AbstractBehaviour {
 			double scaledY = scale(position.y, model.space.height * -0.5,
 					model.space.height * 0.5);
 
-//			Object[] inputs = new Object[] { scaledX, velocity.x, scaledY,
-//					velocity.y, scaleFitness(currentFitness),
-//					scaleFitness(previousFitness), constants[0], constants[1] };
-			
+			// Object[] inputs = new Object[] { scaledX, velocity.x, scaledY,
+			// velocity.y, scaleFitness(currentFitness),
+			// scaleFitness(previousFitness), constants[0], constants[1] };
+
 			Object[] inputs = new Object[] { scaledX, velocity.x, scaledY,
-					velocity.y, scaleFitness(currentFitness), constants[0], constants[1] };
+					velocity.y, scaleFitness(currentFitness), constants[0],
+					constants[1] };
 
 			// update last fitness to current fitness
 			previousFitness = currentFitness;
@@ -168,10 +170,11 @@ public class FitnessBehaviour extends AbstractBehaviour {
 			agent.setVelocity(newVelocity);
 			agent.updatePosition();
 
-//			fEvoState.output.message("executed controller: "
-//					+ interpreter.getExpression());
+			// fEvoState.output.message("executed controller: "
+			// + interpreter.getExpression());
 
 			recordFitness();
+			steps++;
 
 		}
 
@@ -195,7 +198,7 @@ public class FitnessBehaviour extends AbstractBehaviour {
 
 		double avgPrevFitness = 0.0;
 		// first time this is called
-		if (fitnessR.size() == maturationSteps) {
+		if (fitnessR.size() <= maturationSteps) {
 			avgPrevFitness = this.firstFitness;
 		} else {
 			for (int i = 0; i < maturationSteps; i++) {
@@ -264,7 +267,6 @@ public class FitnessBehaviour extends AbstractBehaviour {
 		}
 
 		Output out = Evolve.buildOutput();
-		
 
 		fEvoState = Evolve.initialize(dbase, 0, out);
 		interpreter = new CGPSteppableInterpreter();
@@ -272,6 +274,8 @@ public class FitnessBehaviour extends AbstractBehaviour {
 		resetFitnessRecords();
 		firstFitness = agent.getFitness();
 		fEvoState.startFresh();
+
+		this.maturationSteps = agent.evaluationPeriod;
 
 		// int result = EvolutionState.R_NOTDONE;
 		//
@@ -303,7 +307,7 @@ public class FitnessBehaviour extends AbstractBehaviour {
 
 	private double scaleFitness(double fitness) {
 		double result = 0;
-		if (agent.steps == 0) {
+		if (steps == 0) {
 			minFitness = fitness;
 			maxFitness = fitness;
 		} else {
@@ -332,4 +336,10 @@ public class FitnessBehaviour extends AbstractBehaviour {
 	public ArrayList<Double> getFitnessProgressionRecords(CGPIndividual ind) {
 		return fitnessProgressionRecords.get(ind);
 	}
+
+	@Override
+	public void finish() {
+		Evolve.cleanup(fEvoState);
+	}
+
 }

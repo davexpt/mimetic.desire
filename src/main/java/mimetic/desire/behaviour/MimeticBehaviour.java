@@ -59,6 +59,8 @@ public class MimeticBehaviour extends AbstractBehaviour {
 	private int currentController = 0;
 	private double firstFitness = 0;
 
+	private int steps;
+
 	@Override
 	public void update() {
 		if (fEvoState == null)
@@ -67,15 +69,14 @@ public class MimeticBehaviour extends AbstractBehaviour {
 		else {
 			// select random mediator
 			if (mediator == null) {
-				Agent[] neighbours = model.getNeighobours(agent.index, null);
-				mediator = neighbours[model.random.nextInt(neighbours.length)];
+				mediator = getRandomNeighbour();
 			}
 			int numControllers = fEvoState.population.subpops[0].individuals.length;
 			/*************************************************
 			 * continue executing the controllers
 			 *************************************************/
 			// a controller has maturated, update utility
-			if (agent.steps > 0 && agent.steps % (maturationSteps) == 0) {
+			if (steps > 0 && steps % (maturationSteps) == 0) {
 				double imitationError = currentImitationError(pController);
 
 				// fEvoState.output
@@ -95,6 +96,8 @@ public class MimeticBehaviour extends AbstractBehaviour {
 					currentController = (currentController + 1)
 							% numControllers;
 					utility = INITIAL_UTILITY;
+					// switch mediator, no need for imitation
+					mediator = getRandomNeighbour();
 				}
 			}
 			/*************************************************
@@ -134,7 +137,7 @@ public class MimeticBehaviour extends AbstractBehaviour {
 			double currentFitness = agent.getFitness();
 
 			// in the beginning we dont have historic data about fitness
-			if (agent.steps == 0) {
+			if (steps == 0) {
 				previousFitness = agent.getFitness();
 			}
 
@@ -174,9 +177,15 @@ public class MimeticBehaviour extends AbstractBehaviour {
 			// + interpreter.getExpression());
 
 			recordImitationError();
+			steps++;
 
 		}
 
+	}
+
+	private Agent getRandomNeighbour() {
+		Agent[] neighbours = model.getNeighobours(agent.index, null);
+		return neighbours[model.random.nextInt(neighbours.length)];
 	}
 
 	public double currentImitationError(CGPIndividual controller) {
@@ -234,8 +243,7 @@ public class MimeticBehaviour extends AbstractBehaviour {
 
 		File parameterFile = new File(Thread.currentThread()
 				.getContextClassLoader()
-				.getResource("mimetic_behaviour.params").getPath()
-				.toString());
+				.getResource("mimetic_behaviour.params").getPath().toString());
 
 		ParameterDatabase dbase = null;
 		try {
@@ -247,6 +255,7 @@ public class MimeticBehaviour extends AbstractBehaviour {
 					new Error(
 							"Couldn't load the configuration file for the evolutionary behaviour"));
 		}
+		this.steps = 0;
 
 		Output out = Evolve.buildOutput();
 
@@ -256,6 +265,8 @@ public class MimeticBehaviour extends AbstractBehaviour {
 		resetImitationErrors();
 		firstFitness = agent.getFitness();
 		fEvoState.startFresh();
+
+		this.maturationSteps = agent.evaluationPeriod;
 
 		// int result = EvolutionState.R_NOTDONE;
 		//
@@ -285,7 +296,6 @@ public class MimeticBehaviour extends AbstractBehaviour {
 	private static final double MIN_ERROR = -4.0;
 	private static final double MAX_ERROR = 4.0;
 
-	
 	public double scaleError(double error) {
 
 		return scale(error, MIN_ERROR, MAX_ERROR);
@@ -303,6 +313,11 @@ public class MimeticBehaviour extends AbstractBehaviour {
 
 	public ArrayList<Double> getFitnessProgressionRecords(CGPIndividual ind) {
 		return fitnessProgressionRecords.get(ind);
+	}
+
+	@Override
+	public void finish() {
+		Evolve.cleanup(fEvoState);
 	}
 
 }

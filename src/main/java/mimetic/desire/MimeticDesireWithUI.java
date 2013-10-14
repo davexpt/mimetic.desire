@@ -37,7 +37,7 @@ public class MimeticDesireWithUI extends GUIState {
 	} // non-volatile
 
 	public static String getName() {
-		return "Particle Swarm Optimization";
+		return "Evolutionary Mimetic Behaviour";
 	}
 
 	ContinuousPortrayal2D swarmPortrayal = new ContinuousPortrayal2D();
@@ -108,7 +108,7 @@ public class MimeticDesireWithUI extends GUIState {
 		display.setBackdrop(Color.black);
 
 		displayFrame = display.createFrame();
-		displayFrame.setTitle("Particle Swarm Optimization");
+		displayFrame.setTitle("Fitness Landscape");
 		c.registerFrame(displayFrame); // register the frame so it appears in
 										// the "Display" list
 		displayFrame.setVisible(true);
