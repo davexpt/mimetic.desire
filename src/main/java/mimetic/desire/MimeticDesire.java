@@ -49,7 +49,7 @@ public class MimeticDesire extends SimState {
 	public Agent[] agents;
 
 	// parameters
-	public int numAgents = 100;
+	public int numAgents = 500;
 
 	public int getNumAgents() {
 		return numAgents;
@@ -137,7 +137,7 @@ public class MimeticDesire extends SimState {
 	 * distance. but rather a regular neighbourhood established when the model
 	 * is first set up.
 	 */
-	public Agent[] getNeighobours(int agentIndex, MutableDouble2D pos) {
+	public Agent[] getNeighobours(int agentIndex) {
 
 		Agent[] neighbours = new Agent[neighborhoodSize];
 
@@ -240,7 +240,7 @@ public class MimeticDesire extends SimState {
 		double bv = Double.NEGATIVE_INFINITY;
 		Agent a;
 
-		Agent[] neighbours = getNeighobours(agentIndex, pos);
+		Agent[] neighbours = getNeighobours(agentIndex);
 
 		for (Agent neighbour : neighbours) {
 
@@ -253,6 +253,22 @@ public class MimeticDesire extends SimState {
 		return 1.0;
 	}
 
+	public Agent getBestNeighbour(int agentIndex) {
+
+		Agent[] neighbours = getNeighobours(agentIndex);
+		Agent best = neighbours[random.nextInt(neighbours.length)];
+
+		for (Agent neighbour : neighbours) {
+
+			if (neighbour.bestFitness > best.getFitness()) {
+				best = neighbour;
+
+			}
+		}
+
+		return best;
+	}
+
 	@Override
 	public void finish() {
 		super.finish();
@@ -263,6 +279,10 @@ public class MimeticDesire extends SimState {
 		for (Agent agent : agents) {
 			agent.finish();
 		}
+	}
+
+	public Double2D getBestPosition() {
+		return new Double2D(bestPosition);
 	}
 
 }

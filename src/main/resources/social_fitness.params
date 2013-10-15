@@ -5,7 +5,7 @@ parent.0 = cgp.params
 #POPULATION (how many controller programs are tested by each agent
 #================================================================================
 
-pop.subpop.0.size = 50
+pop.subpop.0.size = 20
 
 
 #================================================================================
@@ -24,11 +24,11 @@ eval.problem = mimetic.desire.behaviour.ecj.problems.FitnessExploitation
 pop.subpop.0.species.function-set = mimetic.desire.behaviour.ecj.functions.Movement
 
 # number of nodes in CGP, not including inputs and outputs.
-pop.subpop.0.species.num-nodes = 30
+pop.subpop.0.species.num-nodes = 10
 
 # number of input nodes in your CGP.  Your problem class feeds these inputs to the CGPInterpreter. 
 #one is for a constant
-pop.subpop.0.species.num-inputs = 7
+pop.subpop.0.species.num-inputs = 10
 
 # number of output nodes in your CGP.  Your problem class extracts these outputs from the CGPInterpreter.
 pop.subpop.0.species.num-outputs = 2

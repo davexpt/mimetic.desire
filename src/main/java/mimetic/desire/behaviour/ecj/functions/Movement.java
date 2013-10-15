@@ -6,6 +6,7 @@ import java.util.Set;
 import ec.cgp.functions.AbstractFunctionSet;
 import ec.cgp.functions.Function;
 import ec.cgp.functions.numeric.AddFn;
+import ec.cgp.functions.numeric.CmpFn;
 import ec.cgp.functions.numeric.DivFn;
 import ec.cgp.functions.numeric.MulFn;
 import ec.cgp.functions.numeric.SinFn;
@@ -41,6 +42,7 @@ public class Movement extends AbstractFunctionSet<Double> {
 		functions.add(new MulFn());
 		functions.add(new DivFn());
 		functions.add(new SinFn());
+		functions.add(new CmpFn());
 
 		return functions;
 	}

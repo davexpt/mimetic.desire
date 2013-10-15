@@ -7,26 +7,21 @@ import java.util.Map;
 
 import javax.management.RuntimeErrorException;
 
+import mimetic.desire.Agent;
+import mimetic.desire.MimeticDesire;
+import mimetic.desire.behaviour.ecj.problems.FitnessExploitation;
+
 import org.apache.commons.math3.analysis.function.Sigmoid;
 import org.apache.commons.math3.util.FastMath;
 
-import com.sun.xml.internal.ws.policy.spi.PolicyAssertionValidator.Fitness;
-
-import sim.app.pacman.Energizer;
 import sim.util.Double2D;
 import ec.EvolutionState;
 import ec.Evolve;
 import ec.Individual;
 import ec.cgp.eval.CGPSteppableInterpreter;
-import ec.cgp.functions.numeric.SigmoidFn;
 import ec.cgp.genome.CGPIndividual;
-import ec.simple.SimpleStatistics;
 import ec.util.Output;
 import ec.util.ParameterDatabase;
-import mimetic.desire.Agent;
-import mimetic.desire.MimeticDesire;
-import mimetic.desire.behaviour.ecj.problems.EvoBehaviourProblem;
-import mimetic.desire.behaviour.ecj.problems.FitnessExploitation;
 
 public class FitnessBehaviour extends AbstractBehaviour {
 
@@ -54,6 +49,8 @@ public class FitnessBehaviour extends AbstractBehaviour {
 		super();
 
 	}
+
+	public double distanceToGlobal;
 
 	// last fitness
 	private double previousFitness = -1;
@@ -90,6 +87,9 @@ public class FitnessBehaviour extends AbstractBehaviour {
 
 				// current utility reached 0, switch controller
 				if (utility <= 0) {
+					//reset distance to global
+					distanceToGlobal=0;
+					
 					numEvaluated++;
 					currentController = (currentController + 1)
 							% numControllers;
@@ -238,6 +238,11 @@ public class FitnessBehaviour extends AbstractBehaviour {
 
 			fitnessRecord.add(Math.pow((currentFitness - previousFitness), 2));
 		}
+
+		// record distance to global
+		double distance = model.space.tds(agent.getPosition(),
+				model.getBestPosition());
+		distanceToGlobal += distance;
 	}
 
 	// TODO move this initialization to an abstract class for Evolutionary

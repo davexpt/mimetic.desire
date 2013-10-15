@@ -1,9 +1,11 @@
 package mimetic.desire;
 
 import mimetic.desire.behaviour.Behaviour;
+import mimetic.desire.behaviour.Competition;
 import mimetic.desire.behaviour.FitnessBehaviour;
 import mimetic.desire.behaviour.MimeticBehaviour;
 import mimetic.desire.behaviour.PSOBehaviour;
+import mimetic.desire.behaviour.SocialFitnessBehaviour;
 import mimetic.desire.behaviour.ecj.problems.FitnessExploitation;
 import sim.app.pso.Evaluatable;
 import sim.engine.SimState;
@@ -33,6 +35,8 @@ public class Agent implements Steppable {
 	Behaviour adhoc;
 
 	Behaviour fitnessExploit;
+
+	Behaviour socialFitness;
 
 	public int evaluationPeriod = 10;
 
@@ -64,23 +68,16 @@ public class Agent implements Steppable {
 		this.steps = 0;
 
 		bestFitnessP = new MutableDouble2D(position);
-		this.bestFitness = this.getFitness();
+		bestFitness = getFitness();
 
-		// this.behaviour = new FitnessBehaviour();
-		// this.behaviour = new MimeticBehaviour();
-		this.behaviour = new MimeticBehaviour();
+		// setup the behaviour
+		this.behaviour = new Competition();
 		behaviour.setup(this, model);
-
-		this.fitnessExploit = new FitnessBehaviour();
-		fitnessExploit.setup(this, model);
-
-		this.adhoc = new PSOBehaviour();
-		this.adhoc.setup(this, model);
-
-		currentBehaviour = behaviour;
 
 		model.space.setObjectLocation(this, new Double2D(position));
 	}
+
+	Behaviour competition;
 
 	private void stepBehaviour(Behaviour evoBehaviour, MimeticDesire model) {
 		evoBehaviour.update();
@@ -89,29 +86,15 @@ public class Agent implements Steppable {
 	public double adhocProb = 0.6;
 	public double fitnessExploitProb = 0.0;
 
-	Behaviour currentBehaviour = null;
-
 	@Override
 	public void step(SimState state) {
 
-		stepBehaviour(currentBehaviour, model);
+		stepBehaviour(behaviour, model);
 
-		// update best fitness
-		updateBest(getFitness(), position.x, position.y);
+		// updates the current fitness, and the global fitness in the model
+		updateFitness(getFitness(), position.x, position.y);
 
 		steps++;
-
-		if (steps > 0 && steps % evaluationPeriod == 0) {
-
-			double random = model.random.nextDouble();
-			if (random < fitnessExploitProb) {
-				currentBehaviour = fitnessExploit;
-
-			} else {
-				currentBehaviour = behaviour;
-			}
-		}
-
 	}
 
 	// get a fitness based on the fitness landscape the agent is considering
@@ -134,6 +117,10 @@ public class Agent implements Steppable {
 
 	public Double2D getVelocity() {
 		return new Double2D(velocity);
+	}
+
+	public Double2D getBestFitnessCoordinates() {
+		return new Double2D(bestFitnessP);
 	}
 
 	// sets the agent current velocity to
@@ -169,7 +156,7 @@ public class Agent implements Steppable {
 
 	}
 
-	public void updateBest(double currVal, double currX, double currY) {
+	public void updateFitness(double currVal, double currX, double currY) {
 		if (currVal > this.bestFitness) {
 			bestFitness = currVal;
 			bestFitnessP.setTo(currX, currY);
@@ -178,4 +165,12 @@ public class Agent implements Steppable {
 		}
 	}
 
+	public double getBestFitness() {
+		return bestFitness;
+	}
+
+	public double getDistanceToGlobalBest() {
+		return model.space.tds(new Double2D(position), new Double2D(
+				model.bestPosition));
+	}
 }

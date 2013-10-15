@@ -24,9 +24,9 @@ import mimetic.desire.behaviour.ecj.problems.MimeticEvaluation;
 
 //TODO this is a rough copy of fitenss behaviour
 //the fitness is how well we are imitation a neighbour rather than the fitness landscape
-public class MimeticBehaviour extends AbstractBehaviour {
+public class Competition extends AbstractBehaviour {
 
-	private final double[] constants = new double[] { 1.0, -1.0 };
+	private final double[] constants = new double[] { 0.5, -0.5 };
 
 	private EvolutionState fEvoState;
 
@@ -37,7 +37,6 @@ public class MimeticBehaviour extends AbstractBehaviour {
 	private static final int INITIAL_UTILITY = 10;
 	private double utility = 30;
 	private double utilityUpdateSpeed = 1.0;
-	private double imitationErrorThreshold = 0.5;
 
 	private Agent mediator = null;
 
@@ -45,10 +44,10 @@ public class MimeticBehaviour extends AbstractBehaviour {
 	private CGPIndividual pController;
 	private CGPSteppableInterpreter interpreter;
 
-	private Map<Individual, ArrayList<Double2D>> imitationErrors;
+	private Map<Individual, ArrayList<Double>> imitationErrors;
 	private Map<Individual, ArrayList<Double>> fitnessProgressionRecords;
 
-	public MimeticBehaviour() {
+	public Competition() {
 		super();
 
 	}
@@ -61,6 +60,8 @@ public class MimeticBehaviour extends AbstractBehaviour {
 
 	private int steps;
 
+	private double competitionThreshold = 0.1;
+
 	@Override
 	public void update() {
 		if (fEvoState == null)
@@ -69,7 +70,7 @@ public class MimeticBehaviour extends AbstractBehaviour {
 		else {
 			// select random mediator
 			if (mediator == null) {
-				mediator = getRandomNeighbour();
+				mediator = model.getBestNeighbour(agent.index);
 			}
 			int numControllers = fEvoState.population.subpops[0].individuals.length;
 			/*************************************************
@@ -77,19 +78,12 @@ public class MimeticBehaviour extends AbstractBehaviour {
 			 *************************************************/
 			// a controller has maturated, update utility
 			if (steps > 0 && steps % (maturationSteps) == 0) {
-				double imitationError = currentImitationError(pController);
+				double competitionResult = currentCompetitionResult(pController);
 
-				// fEvoState.output
-				// .message("controller evaluated, computing progression: "
-				// + progress);
-
+				
 				// update utility
-				this.utility = utility
-						+ (FastMath.abs(imitationError) >= imitationErrorThreshold ? -1
-								* utilityUpdateSpeed
-								: utilityUpdateSpeed);
-
-				// fEvoState.output.message("current utility: " + utility);
+				utility += competitionResult > 0 - competitionThreshold ? -0.01 * utilityUpdateSpeed
+						: -1 * utilityUpdateSpeed;
 
 				// current utility reached 0, switch controller
 				if (utility <= 0) {
@@ -97,8 +91,9 @@ public class MimeticBehaviour extends AbstractBehaviour {
 					currentController = (currentController + 1)
 							% numControllers;
 					utility = INITIAL_UTILITY;
-					// switch mediator, no need for imitation
-					mediator = getRandomNeighbour();
+
+					// switch mediator, need a better mediator, or himself
+					mediator = model.getBestNeighbour(agent.index);
 				}
 			}
 			/*************************************************
@@ -142,17 +137,25 @@ public class MimeticBehaviour extends AbstractBehaviour {
 				previousFitness = agent.getFitness();
 			}
 
+			Double2D bestLocalFitness = agent.getBestFitnessCoordinates();
+
 			double scaledX = scale(position.x, model.space.width * -0.5,
 					model.space.width * 0.5);
 			double scaledY = scale(position.y, model.space.height * -0.5,
 					model.space.height * 0.5);
+
+			double bestLocalX = scale(bestLocalFitness.x, model.space.width
+					* -0.5, model.space.width * 0.5);
+			double bestLocalY = scale(bestLocalFitness.y, model.space.height
+					* -0.5, model.space.height * 0.5);
 
 			// Object[] inputs = new Object[] { scaledX, velocity.x, scaledY,
 			// velocity.y, scaleFitness(currentFitness),
 			// scaleFitness(previousFitness), constants[0], constants[1] };
 
 			Object[] inputs = new Object[] { scaledX, velocity.x, scaledY,
-					velocity.y, constants[0], constants[1] };
+					velocity.y, bestLocalX, bestLocalY, constants[0],
+					constants[1] };
 
 			// update last fitness to current fitness
 			previousFitness = currentFitness;
@@ -177,7 +180,7 @@ public class MimeticBehaviour extends AbstractBehaviour {
 			// fEvoState.output.message("executed controller: "
 			// + interpreter.getExpression());
 
-			recordImitationError();
+			recordCompetitionStatus();
 			steps++;
 
 		}
@@ -189,18 +192,16 @@ public class MimeticBehaviour extends AbstractBehaviour {
 		return neighbours[model.random.nextInt(neighbours.length)];
 	}
 
-	public double currentImitationError(CGPIndividual controller) {
-		ArrayList<Double2D> imitationErrorR = imitationErrors.get(controller);
+	public double currentCompetitionResult(CGPIndividual controller) {
+		ArrayList<Double> competitionStats = imitationErrors.get(controller);
 
 		double imitationError = 0.0;
 
-		for (Double2D vErrors : imitationErrorR) {
-			imitationError += FastMath.abs(vErrors.x) + FastMath.abs(vErrors.y);
+		for (Double fError : competitionStats) {
+			imitationError += fError;
 		}
-		// mean for the observations
-		imitationError /= imitationErrorR.size();
-
-		return imitationError;
+		// observation average
+		return imitationError /= competitionStats.size();
 	}
 
 	/**
@@ -208,27 +209,23 @@ public class MimeticBehaviour extends AbstractBehaviour {
 	 * its position) so that we record its current fitness and relate it with
 	 * the individual controller program behing evaluated
 	 */
-	private void recordImitationError() {
+	private void recordCompetitionStatus() {
 		if (imitationErrors == null) {
 			throw new RuntimeException(
 					"Fitness Records were not initialised for this behaviour, we cant record");
 		} else {
 
 			if (!imitationErrors.containsKey(pController)) {
-				imitationErrors.put(pController, new ArrayList<Double2D>());
+				imitationErrors.put(pController, new ArrayList<Double>());
 			}
-			ArrayList<Double2D> errorRecord = imitationErrors.get(pController);
+			ArrayList<Double> errorRecord = imitationErrors.get(pController);
 
-			Double2D dxdy = agent.getVelocity();
-			Double2D dxdyMediator = mediator.getVelocity();
+			double fitness = agent.getFitness();
+			double fitnessMediator = mediator.getBestFitness();
 
-			double xError = FastMath.abs(dxdy.x - dxdyMediator.x);
-			double yError = FastMath.abs(dxdy.y - dxdyMediator.y);
+			double fitnessDiff = (scaleFitness(fitness) - scaleFitness(fitnessMediator));
 
-			xError = (dxdy.x < dxdyMediator.x) ? xError * -1 : xError;
-			yError = (dxdy.y < dxdyMediator.y) ? xError * -1 : yError;
-
-			errorRecord.add(new Double2D(xError, yError));
+			errorRecord.add(fitnessDiff);
 		}
 	}
 
@@ -243,8 +240,8 @@ public class MimeticBehaviour extends AbstractBehaviour {
 		super.setup(agent, model);
 
 		File parameterFile = new File(Thread.currentThread()
-				.getContextClassLoader()
-				.getResource("mimetic_behaviour.params").getPath().toString());
+				.getContextClassLoader().getResource("competition.params")
+				.getPath().toString());
 
 		ParameterDatabase dbase = null;
 		try {
@@ -284,12 +281,12 @@ public class MimeticBehaviour extends AbstractBehaviour {
 	}
 
 	private void resetImitationErrors() {
-		imitationErrors = new HashMap<Individual, ArrayList<Double2D>>();
+		imitationErrors = new HashMap<Individual, ArrayList<Double>>();
 		fitnessProgressionRecords = new HashMap<Individual, ArrayList<Double>>();
 
 	}
 
-	public ArrayList<Double2D> getImitationErrors(CGPIndividual ind) {
+	public ArrayList<Double> getImitationErrors(CGPIndividual ind) {
 		return imitationErrors.get(ind);
 	}
 
@@ -309,6 +306,30 @@ public class MimeticBehaviour extends AbstractBehaviour {
 			return 0;
 
 		double result = 2 * ((value - min) / (max - min)) - 1;
+		return result;
+	}
+
+	// min / max fitenss
+	private double minFitness = 0.0;
+	private double maxFitness = 0.0;
+
+	private double scaleFitness(double fitness) {
+		double result = 0;
+		if (steps == 0) {
+			minFitness = fitness;
+			maxFitness = fitness;
+		} else {
+
+			// found a new max
+			if (fitness > maxFitness) {
+				maxFitness = fitness;
+			} else if (fitness < minFitness) {
+				minFitness = fitness;
+			}
+
+			// rescale
+			result = scale(fitness, minFitness, maxFitness);
+		}
 		return result;
 	}
 

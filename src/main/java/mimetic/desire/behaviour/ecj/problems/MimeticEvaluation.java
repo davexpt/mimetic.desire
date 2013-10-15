@@ -4,6 +4,7 @@ import java.util.ArrayList;
 
 import org.apache.commons.math3.util.FastMath;
 
+import mimetic.desire.behaviour.Competition;
 import mimetic.desire.behaviour.MimeticBehaviour;
 import sim.util.Double2D;
 import ec.EvolutionState;
@@ -27,9 +28,9 @@ public class MimeticEvaluation extends AbstractEvoBehaviourProblem {
 	public void evaluate(EvolutionState state, Individual ind,
 			int subpopulation, int threadnum) {
 
-		MimeticBehaviour behave = (MimeticBehaviour) super.behaviour;
+		Competition behave = (Competition) super.behaviour;
 
-		ArrayList<Double2D> mimeticError = behave
+		ArrayList<Double> mimeticError = behave
 				.getImitationErrors((CGPIndividual) ind);
 
 		if (mimeticError == null) {
@@ -37,9 +38,12 @@ public class MimeticEvaluation extends AbstractEvoBehaviourProblem {
 					"FitnessExploitation Problem is trying to retrieve a fitness record for an individual that was not evaluated, probably, evolve was called before all the controllers could be evaluated");
 		} else {
 			float fitness = 0;
-			fitness += behave.currentImitationError((CGPIndividual) ind);
+			fitness = (float) behave
+					.currentCompetitionResult((CGPIndividual) ind);
 
-			fitness = (1 / fitness);
+			// fitness += behave.currentCompetitionResult((CGPIndividual) ind);
+
+			// fitness = fitness);
 
 			// instead of mean try the last value ending up in a good fitness
 			// fitness = (float) (1.0 * fitnessRecord
