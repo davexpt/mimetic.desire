@@ -38,7 +38,7 @@ public class Agent implements Steppable {
 
 	Behaviour socialFitness;
 
-	public int evaluationPeriod = 10;
+	public int evaluationPeriod = 1;
 
 	/**
 	 * 

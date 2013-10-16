@@ -46,6 +46,16 @@ public class MimeticDesire extends SimState {
 	public double width = 20.24;
 	public double height = 20.24;
 
+	public double size = 20.24;
+
+	public double getSize() {
+		return size;
+	}
+
+	public void setSize(double size) {
+		this.size = size;
+	}
+
 	public Agent[] agents;
 
 	// parameters
@@ -166,6 +176,10 @@ public class MimeticDesire extends SimState {
 
 		if (agents != null)
 			cleanAgents();
+
+		height = size;
+		width = size;
+		
 		agents = new Agent[numAgents];
 		space = new Continuous2D(height, width, height);
 

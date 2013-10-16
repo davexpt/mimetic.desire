@@ -63,9 +63,10 @@ public class MimeticDesireWithUI extends GUIState {
 	@SuppressWarnings("serial")
 	public void setupPortrayals() {
 		MimeticDesire swarm = (MimeticDesire) state;
+		
 		final SimpleColorMap map = new SimpleColorMap(
 				swarm.fitnessFunctionLowerBound[swarm.fitnessFunction], 1000,
-				Color.blue, Color.red);
+				Color.yellow, Color.red);
 
 		swarmPortrayal.setField(swarm.space);
 		swarmPortrayal.setPortrayalForAll(new OvalPortrayal2D() {
