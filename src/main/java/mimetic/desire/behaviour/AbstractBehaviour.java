@@ -4,8 +4,8 @@ import mimetic.desire.Agent;
 import mimetic.desire.MimeticDesire;
 
 public abstract class AbstractBehaviour implements Behaviour {
-	Agent agent;
-	MimeticDesire model;
+	protected Agent agent;
+	protected MimeticDesire model;
 
 	@Override
 	public void setup(Agent agent, MimeticDesire model) {
