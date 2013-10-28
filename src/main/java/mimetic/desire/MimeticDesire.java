@@ -59,7 +59,7 @@ public class MimeticDesire extends SimState {
 	public Agent[] agents;
 
 	// parameters
-	public int numAgents = 500;
+	public int numAgents = 1;
 
 	public int getNumAgents() {
 		return numAgents;

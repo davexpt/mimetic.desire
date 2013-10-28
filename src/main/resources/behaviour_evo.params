@@ -5,7 +5,7 @@ parent.0 = cgp.params
 #POPULATION (how many controller programs are tested by each agent
 #================================================================================
 
-pop.subpop.0.size = 20
+pop.subpop.0.size = 3
 
 
 #================================================================================
@@ -13,7 +13,7 @@ pop.subpop.0.size = 20
 # possible boolean inputs.  The CGPEvaluator computes the output value of the 
 # function represented by the genome.  
 #================================================================================
-eval.problem = mimetic.desire.behaviour.ecj.problems.MimeticEvaluation
+eval.problem = mimetic.desire.behaviour.ecj.problems.meta.BehaviourEvolution
 
 
 

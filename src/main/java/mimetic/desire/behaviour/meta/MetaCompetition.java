@@ -1,17 +1,25 @@
 package mimetic.desire.behaviour.meta;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.management.RuntimeErrorException;
 
+import org.apache.commons.collections.keyvalue.MultiKey;
+import org.apache.commons.collections.map.MultiKeyMap;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.math3.analysis.function.Sigmoid;
+import org.apache.commons.math3.analysis.solvers.NewtonRaphsonSolver;
 
+import sim.util.Double2D;
 import ec.EvolutionState;
 import ec.Evolve;
 import ec.Individual;
 import ec.Problem;
+import ec.app.tutorial3.MyStatistics;
 import ec.cgp.eval.CGPSteppableInterpreter;
 import ec.cgp.genome.CGPIndividual;
 import ec.simple.SimpleStatistics;
@@ -69,8 +77,23 @@ public class MetaCompetition extends AbstractBehaviour {
 		steps = 0;
 		cgpInterpreter = new CGPSteppableInterpreter();
 
-		setupEvoState(behaviourEvo, "behaviour_evo.params");
-		setupEvoState(objectiveEvo, "objective_evo.params");
+		behaviourEvo = setupEvoState("behaviour_evo.params");
+		objectiveEvo = setupEvoState("objective_evo.params");
+
+		// energy samples is a multi map that stores the samples for the various
+		// predictors
+		energySamples = new MultiKeyMap();
+
+		competitionEnergySamples = new HashMap<>();
+
+		// first run uses random predictor
+		currentObjectiveFn = (CGPIndividual) objectiveEvo.population.subpops[0].individuals[model.random
+				.nextInt(objectiveEvo.population.subpops[0].individuals.length)];
+
+		// we need to keep track of the energy values for all the objective
+		// functions
+		resetEnergy();
+
 	}
 
 	/**
@@ -82,7 +105,9 @@ public class MetaCompetition extends AbstractBehaviour {
 	 * @param filename
 	 *            the parameter file
 	 */
-	private void setupEvoState(EvolutionState evoState, String filename) {
+	private EvolutionState setupEvoState(String filename) {
+		EvolutionState evoState;
+
 		File parameterFile = new File(Thread.currentThread()
 				.getContextClassLoader().getResource(filename).getPath()
 				.toString());
@@ -100,8 +125,10 @@ public class MetaCompetition extends AbstractBehaviour {
 
 		Output out = Evolve.buildOutput();
 
-		behaviourEvo = Evolve.initialize(dbase, 0, out);
-		behaviourEvo.startFresh();
+		evoState = Evolve.initialize(dbase, 0, out);
+		evoState.startFresh();
+
+		return evoState;
 	}
 
 	/**
@@ -122,10 +149,22 @@ public class MetaCompetition extends AbstractBehaviour {
 	private Agent mediator = null;
 	private static final int DEFAULT_ENERGY = 100;
 	private static final double ENERGY_UPDATE = 1;
-	private double energy = DEFAULT_ENERGY;
+	// private double energy = DEFAULT_ENERGY;
+
+	private Map<CGPIndividual, Double> energy = null;
+
+	// energy value that would be considered if the objective was to compete for
+	// actual fitness
+	private double competitionEnergy;
+	private Map<CGPIndividual, ArrayList<Double>> competitionEnergySamples;
 
 	private CGPIndividual controller;
 	private Object[] lastInputs;
+	// private Object[] lastOutputs;
+
+	// behaviour progress controll
+	private int behavioursEvaluated = 0;
+	private int currentController = 0;
 	private Object[] lastOutputs;
 
 	/**
@@ -153,21 +192,148 @@ public class MetaCompetition extends AbstractBehaviour {
 			// behaviourEvo.population.subpops[0].individuals.length;
 
 			// evolves behaviour if all the controllers have been evaluated
-			evolveBehaviour();
+			int numControllers = behaviourEvo.population.subpops[0].individuals.length;
+			// we evaluated all the controllers so its time to evolve
+			if (behavioursEvaluated == numControllers) {
+				evolveBehaviour();
 
-			// evolves objectives if all controllers have been evaluated
-			// evolveObjectives();
+				// evolves objectives if all controllers have been evaluated
+				evolveObjectives();
+
+				resetEnergySamples();
+			}
 
 			// switches controllers if out of energy
 			updateController();
 
 			// run current controller
-			//runController();
+			runController();
 
 			// update energy values based on the best objective function
 			updateEnergy();
 
+			// samples the energy values based on the sampling interval
+			sampleEnergy();
+
 			steps++;
+
+		}
+	}
+
+	private void resetEnergySamples() {
+		energySamples = new MultiKeyMap();
+		competitionEnergySamples = new HashMap<>();
+	}
+
+	private void resetEnergy() {
+		energy = new HashMap<CGPIndividual, Double>();
+		Individual[] objectives = objectiveEvo.population.subpops[0].individuals;
+		for (Individual ind : objectives) {
+			CGPIndividual objective = (CGPIndividual) ind;
+			energy.put(objective, new Double(DEFAULT_ENERGY));
+		}
+
+		competitionEnergy = DEFAULT_ENERGY;
+
+	}
+
+	private static final double constants[] = new double[] { 0.5, -0.5 };
+
+	private void runController() {
+		// interpret the result and update the velocity of the agent
+		cgpInterpreter.load(controller);
+
+		// prepare inputs for cgp controller program(x)(y)(dx)(dy)(f) |
+		// (f-1) ----num inputs 8 ---- num outputs 2
+		Double2D position = agent.getPosition();
+		Double2D velocity = agent.getVelocity();
+
+		double currentFitness = agent.getFitness();
+
+		// in the beginning we dont have historic data about fitness
+		// if (steps == 0) {
+		// //previousFitness = agent.getFitness();
+		// }
+
+		Double2D bestLocalFitness = agent.getBestFitnessCoordinates();
+
+		double scaledX = Utils.scale(position.x, model.space.width * -0.5,
+				model.space.width * 0.5);
+		double scaledY = Utils.scale(position.y, model.space.height * -0.5,
+				model.space.height * 0.5);
+
+		// double bestLocalX = Utils.scale(bestLocalFitness.x, model.space.width
+		// * -0.5, model.space.width * 0.5);
+		// double bestLocalY = Utils.scale(bestLocalFitness.y,
+		// model.space.height
+		// * -0.5, model.space.height * 0.5);
+
+		// Object[] inputs = new Object[] { scaledX, velocity.x, scaledY,
+		// velocity.y, scaleFitness(currentFitness),
+		// scaleFitness(previousFitness), constants[0], constants[1] };
+
+		Object[] inputs = new Object[] { scaledX, velocity.x, scaledY,
+				velocity.y, constants[0], constants[1] };
+
+		// this is used as the inputs for the objective function
+		lastInputs = ArrayUtils.clone(inputs);
+
+		// update last fitness to current fitness
+		// previousFitness = currentFitness;
+
+		// run the controller program
+		while (!cgpInterpreter.finished()) {
+			cgpInterpreter.step(inputs);
+		}
+		Object[] outputs = cgpInterpreter.getOutput();
+
+		lastOutputs = ArrayUtils.clone(outputs);
+		// apply sigmoid to outputs to restrict velocity from -1 to 1
+
+		double dx = Utils.squash((double) outputs[0]);
+		double dy = Utils.squash((double) outputs[1]);
+
+		Double2D newVelocity = new Double2D(dx, dy);
+		// set the new position on the model
+		agent.setVelocity(newVelocity);
+		agent.updatePosition();
+
+	}
+
+	// energy sampling for the multiple objective functions and the competition
+	// function
+	public static final int ENERGY_SAMPLING_INTERVAL = 3;
+	private MultiKeyMap energySamples;
+
+	private void sampleEnergy() {
+
+		if (steps % ENERGY_SAMPLING_INTERVAL == 0) {
+			Individual[] objectives = objectiveEvo.population.subpops[0].individuals;
+
+			for (Individual objective : objectives) {
+				MultiKey key = new MultiKey(controller, objective);
+				if (!energySamples.containsKey(key)) {
+					energySamples.put(controller, objective,
+							new ArrayList<Double>());
+				}
+				@SuppressWarnings("unchecked")
+				ArrayList<Double> controllerSamples = (ArrayList<Double>) energySamples
+						.get(key);
+				controllerSamples.add(energy.get(objective));
+			}
+
+			// sample energy based on competition
+			if (!competitionEnergySamples.containsKey(controller)) {
+				competitionEnergySamples.put(controller,
+						new ArrayList<Double>());
+			}
+			ArrayList<Double> competitionSamples = (ArrayList<Double>) competitionEnergySamples
+					.get(controller);
+
+			competitionSamples.add(competitionEnergy);
+
+			// TODO samples for actual fitness
+			// TODO samples for imitation
 		}
 	}
 
@@ -179,13 +345,14 @@ public class MetaCompetition extends AbstractBehaviour {
 	 * was updated by specific goals such as fitness, competition or imitation.
 	 */
 	private void evolveObjectives() {
-		ObjectiveEvolution problem = (ObjectiveEvolution) behaviourEvo.evaluator.p_problem;
+		ObjectiveEvolution problem = (ObjectiveEvolution) objectiveEvo.evaluator.p_problem;
 		// usually it is not, the first time
 		if (!problem.isSetup()) {
 			problem.setup(agent, model, this);
 		}
+		// TODO do not evolve yet
 		// generate the next batch of controllers
-		objectiveEvo.evolve();
+		// objectiveEvo.evolve();
 	}
 
 	/**
@@ -200,24 +367,19 @@ public class MetaCompetition extends AbstractBehaviour {
 	 * resets the behaviourEvaluator count to 0.
 	 */
 	private void evolveBehaviour() {
-		int numControllers = behaviourEvo.population.subpops[0].individuals.length;
-		// we evaluated all the controllers so its time to evolve
-		if (behavioursEvaluated == numControllers) {
-			BehaviourEvolution problem = (BehaviourEvolution) behaviourEvo.evaluator.p_problem;
-			// usually it is not, the first time
-			if (!problem.isSetup()) {
-				problem.setup(agent, model, this);
-			}
-			// generate the next batch of controllers
-			behaviourEvo.evolve();
-			behavioursEvaluated = 0;
 
-			evolveObjectives();
+		BehaviourEvolution problem = (BehaviourEvolution) behaviourEvo.evaluator.p_problem;
+		// usually it is not, the first time
+		if (!problem.isSetup()) {
+			problem.setup(agent, model, this);
 		}
-	}
+		// generate the next batch of controllers
+		behaviourEvo.evolve();
+		behavioursEvaluated = 0;
 
-	private int behavioursEvaluated = 0;
-	private int currentController = 0;
+		evolveObjectives();
+
+	}
 
 	/**
 	 * Increments number of controllers evaluated. This should be restored to 0
@@ -226,20 +388,23 @@ public class MetaCompetition extends AbstractBehaviour {
 	private void updateController() {
 		if (steps == 0) {
 			controller = (CGPIndividual) behaviourEvo.population.subpops[0].individuals[0];
-		} else
+		} else {
+			// the first value for the energy associated with a objective
+			// function is the default
 
-		// controller is performing baddly, evaluate the next controller
-		if (energy <= 0) {
+			// controller is performing baddly, evaluate the next controller
+			if (energy.get(getObjectiveFunction()) <= 0) {
 
-			behavioursEvaluated++;
-			int numControllers = behaviourEvo.population.subpops[0].individuals.length;
-			currentController = (currentController + 1) % numControllers;
+				behavioursEvaluated++;
+				int numControllers = behaviourEvo.population.subpops[0].individuals.length;
+				currentController = (currentController + 1) % numControllers;
 
-			// get next controller
-			controller = (CGPIndividual) behaviourEvo.population.subpops[0].individuals[currentController];
+				// get next controller
+				controller = (CGPIndividual) behaviourEvo.population.subpops[0].individuals[currentController];
 
-			// restore energy
-			energy = DEFAULT_ENERGY;
+				// restore energy
+				resetEnergy();
+			}
 		}
 	}
 
@@ -250,7 +415,59 @@ public class MetaCompetition extends AbstractBehaviour {
 	 * the controller.
 	 */
 	private void updateEnergy() {
-		energy = ENERGY_UPDATE * evaluateController(controller);
+
+		Map<CGPIndividual, Double> evaluations = evaluateController(controller);
+
+		Individual[] objectives = objectiveEvo.population.subpops[0].individuals;
+		// update the energy values for all the predictors
+		// the only energy used is the one for the best predictor but we need
+		// the other values to evolve the predictors
+		for (Individual objective : objectives) {
+			CGPIndividual obj = (CGPIndividual) objective;
+
+			double energyValue = energy.get(obj);
+
+			energy.put(obj, energyValue + ENERGY_UPDATE * evaluations.get(obj));
+		}
+
+		// evaluate competition
+		competitionEnergy = ENERGY_UPDATE * evaluateCompetition();
+
+	}
+
+	// evaluate competition based on scaled fitness difference
+	private double evaluateCompetition() {
+
+		double fitness = agent.getFitness();
+		double fitnessMediator = mediator.getBestFitness();
+
+		double fitnessDiff = (scaleFitness(fitness) - scaleFitness(fitnessMediator));
+
+		return fitnessDiff;
+	}
+
+	// min / max fitenss
+	private double minFitness = 0.0;
+	private double maxFitness = 0.0;
+
+	private double scaleFitness(double fitness) {
+		double result = 0;
+		if (steps == 0) {
+			minFitness = fitness;
+			maxFitness = fitness;
+		} else {
+
+			// found a new max
+			if (fitness > maxFitness) {
+				maxFitness = fitness;
+			} else if (fitness < minFitness) {
+				minFitness = fitness;
+			}
+
+			// rescale
+			result = Utils.scale(fitness, minFitness, maxFitness);
+		}
+		return result;
 	}
 
 	/**
@@ -261,25 +478,71 @@ public class MetaCompetition extends AbstractBehaviour {
 	 *            the {@link CGPIndividual CGP program} being evaluated
 	 * @return an evaluation value between 0 and 1.
 	 */
-	private double evaluateController(CGPIndividual controller) {
+	private Map<CGPIndividual, Double> evaluateController(
+			CGPIndividual controller) {
+		Map<CGPIndividual, Double> evaluations = new HashMap<CGPIndividual, Double>();
+
 		Object[] inputs = ArrayUtils.addAll(lastInputs, lastOutputs);
 
-		Individual[] inds = ((SimpleStatistics) (objectiveEvo.statistics))
-				.getBestSoFar();
-		CGPIndividual objectiveFn = (CGPIndividual) inds[0];
+		Individual[] objectives = objectiveEvo.population.subpops[0].individuals;
+		for (Individual objective : objectives) {
+			CGPIndividual obj = (CGPIndividual) objective;
 
-		cgpInterpreter.load(objectiveFn);
-		while (!cgpInterpreter.finished()) {
-			cgpInterpreter.step(inputs);
+			cgpInterpreter.load(obj);
+			while (!cgpInterpreter.finished()) {
+				cgpInterpreter.step(inputs);
+			}
+			double output = (double) cgpInterpreter.getOutput()[0];
+			evaluations.put(obj, Utils.squash(output));
+
 		}
-
-		double output = (double) cgpInterpreter.getOutput()[0];
-
-		return Utils.squash(output);
+		return evaluations;
 	}
 
 	private void updateMediator() {
 		Agent[] neighbours = model.getNeighobours(agent.index);
 		mediator = neighbours[model.random.nextInt(neighbours.length)];
+	}
+
+	CGPIndividual currentObjectiveFn;
+
+	/**
+	 * Returns the current objective function which is the best of the current
+	 * predictors
+	 * 
+	 * @return
+	 */
+	public CGPIndividual getObjectiveFunction() {
+		// the first run uses a random predictor
+		if (objectiveEvo.generation > 0) {
+			// the next runs have statistics to pick best objective function
+			Individual[] inds = ((SimpleStatistics) (objectiveEvo.statistics))
+					.getBestSoFar();
+			currentObjectiveFn = (CGPIndividual) inds[0];
+		}
+		return currentObjectiveFn;
+	}
+
+	public double getCompetitionEnergy() {
+		return competitionEnergy;
+	}
+
+	@SuppressWarnings("unchecked")
+	public ArrayList<Double> getEnergySamples(CGPIndividual controller,
+			CGPIndividual objective) {
+		return (ArrayList<Double>) energySamples.get(new MultiKey(controller,
+				objective));
+	}
+
+	public ArrayList<Double> getCompetitionEnergySamples(
+			CGPIndividual controller) {
+		return competitionEnergySamples.get(controller);
+	}
+
+	public Individual[] getControllers() {
+		return behaviourEvo.population.subpops[0].individuals;
+	}
+	public Individual[] getObjectives(){
+		return objectiveEvo.population.subpops[0].individuals;
 	}
 }

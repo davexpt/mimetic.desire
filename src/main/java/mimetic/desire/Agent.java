@@ -7,6 +7,7 @@ import mimetic.desire.behaviour.MimeticBehaviour;
 import mimetic.desire.behaviour.PSOBehaviour;
 import mimetic.desire.behaviour.SocialFitnessBehaviour;
 import mimetic.desire.behaviour.ecj.problems.FitnessExploitation;
+import mimetic.desire.behaviour.meta.MetaCompetition;
 import sim.app.pso.Evaluatable;
 import sim.engine.SimState;
 import sim.engine.Steppable;
@@ -32,11 +33,6 @@ public class Agent implements Steppable {
 	// evolutionary behaviour
 	Behaviour behaviour;
 
-	Behaviour adhoc;
-
-	Behaviour fitnessExploit;
-
-	Behaviour socialFitness;
 
 	public int evaluationPeriod = 1;
 
@@ -71,20 +67,19 @@ public class Agent implements Steppable {
 		bestFitness = getFitness();
 
 		// setup the behaviour
-		this.behaviour = new Competition();
+		this.behaviour = new MetaCompetition();
 		behaviour.setup(this, model);
 
 		model.space.setObjectLocation(this, new Double2D(position));
 	}
 
-	Behaviour competition;
+	
 
 	private void stepBehaviour(Behaviour evoBehaviour, MimeticDesire model) {
 		evoBehaviour.update();
 	}
 
-	public double adhocProb = 0.6;
-	public double fitnessExploitProb = 0.0;
+	
 
 	@Override
 	public void step(SimState state) {

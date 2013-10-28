@@ -74,7 +74,7 @@ pop.subpop.0.species.pipe.source.0.source.1.size = 20
 # Our custom stats class prints out newly discovered best-of run individuals
 # as they are discovered.
 #================================================================================
-stat = ec.Statistics
+stat = ec.cgp.Stats
 
 
 
