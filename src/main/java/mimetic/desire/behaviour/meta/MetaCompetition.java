@@ -542,7 +542,8 @@ public class MetaCompetition extends AbstractBehaviour {
 	public Individual[] getControllers() {
 		return behaviourEvo.population.subpops[0].individuals;
 	}
-	public Individual[] getObjectives(){
+
+	public Individual[] getObjectives() {
 		return objectiveEvo.population.subpops[0].individuals;
 	}
 }
