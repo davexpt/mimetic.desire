@@ -1,9 +1,10 @@
 package mimetic.desire.behaviour.ecj.problems.meta;
 
-import java.util.ArrayList;
-
 import mimetic.desire.behaviour.ecj.problems.AbstractEvoBehaviourProblem;
 import mimetic.desire.behaviour.meta.MetaCompetition;
+
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+
 import ec.EvolutionState;
 import ec.Individual;
 import ec.cgp.FitnessCGP;
@@ -20,26 +21,19 @@ public class BehaviourEvolution extends AbstractEvoBehaviourProblem {
 		// function
 		MetaCompetition b = (MetaCompetition) behaviour;
 
-		
-		CGPIndividual currentController = (CGPIndividual) ind;
-		CGPIndividual bestObjective = b.getObjectiveFunction();
+		CGPIndividual controller = (CGPIndividual) ind;
+		CGPIndividual objective = b.getObjectiveFunction();
 
-		ArrayList<Double> energySamples = b.getEnergySamples(currentController,
-				bestObjective);
+		DescriptiveStatistics energyStats = b.getEnergyStats(controller,
+				objective);
 
-		float fitnessValue = 0.0f;
-
-		// average of energy samples
-		for (Double value : energySamples) {
-			fitnessValue += value;
-		}
-		fitnessValue /= energySamples.size();
+		float fitnessValue = (float) energyStats.getMean();
 
 		// set fitness value based on the energy samples from the best objective
 		// function
 
-		FitnessCGP fitness = (FitnessCGP) currentController.fitness;
+		FitnessCGP fitness = (FitnessCGP) controller.fitness;
 		fitness.setFitness(state, fitnessValue, false);
-		currentController.evaluated = true;
+		controller.evaluated = true;
 	}
 }

@@ -2,36 +2,33 @@ package mimetic.desire.behaviour.meta;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 import javax.management.RuntimeErrorException;
 
+import mimetic.desire.Agent;
+import mimetic.desire.MimeticDesire;
+import mimetic.desire.behaviour.AbstractBehaviour;
+import mimetic.desire.behaviour.ecj.problems.meta.BehaviourEvolution;
+import mimetic.desire.behaviour.ecj.problems.meta.ObjectiveEvolution;
+import mimetic.desire.util.Utils;
+
 import org.apache.commons.collections.keyvalue.MultiKey;
 import org.apache.commons.collections.map.MultiKeyMap;
 import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.math3.analysis.function.Sigmoid;
-import org.apache.commons.math3.analysis.solvers.NewtonRaphsonSolver;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 
 import sim.util.Double2D;
 import ec.EvolutionState;
 import ec.Evolve;
 import ec.Individual;
 import ec.Problem;
-import ec.app.tutorial3.MyStatistics;
 import ec.cgp.eval.CGPSteppableInterpreter;
 import ec.cgp.genome.CGPIndividual;
 import ec.simple.SimpleStatistics;
 import ec.util.Output;
 import ec.util.ParameterDatabase;
-import mimetic.desire.Agent;
-import mimetic.desire.MimeticDesire;
-import mimetic.desire.behaviour.AbstractBehaviour;
-import mimetic.desire.behaviour.ecj.problems.MimeticEvaluation;
-import mimetic.desire.behaviour.ecj.problems.meta.BehaviourEvolution;
-import mimetic.desire.behaviour.ecj.problems.meta.ObjectiveEvolution;
-import mimetic.desire.util.Utils;
 
 /**
  * TODO move part of this code to an abstract MetaBehaviour class.
@@ -82,9 +79,7 @@ public class MetaCompetition extends AbstractBehaviour {
 
 		// energy samples is a multi map that stores the samples for the various
 		// predictors
-		energySamples = new MultiKeyMap();
-
-		competitionEnergySamples = new HashMap<>();
+		resetEnergySamples();
 
 		// first run uses random predictor
 		currentObjectiveFn = (CGPIndividual) objectiveEvo.population.subpops[0].individuals[model.random
@@ -157,6 +152,7 @@ public class MetaCompetition extends AbstractBehaviour {
 	// actual fitness
 	private double competitionEnergy;
 	private Map<CGPIndividual, ArrayList<Double>> competitionEnergySamples;
+	private Map<CGPIndividual, DescriptiveStatistics> compEnergyStats;
 
 	private CGPIndividual controller;
 	private Object[] lastInputs;
@@ -222,7 +218,10 @@ public class MetaCompetition extends AbstractBehaviour {
 
 	private void resetEnergySamples() {
 		energySamples = new MultiKeyMap();
+		coEvoEnergyStats = new MultiKeyMap();
+
 		competitionEnergySamples = new HashMap<>();
+		compEnergyStats = new HashMap<>();
 	}
 
 	private void resetEnergy() {
@@ -304,6 +303,7 @@ public class MetaCompetition extends AbstractBehaviour {
 	// function
 	public static final int ENERGY_SAMPLING_INTERVAL = 3;
 	private MultiKeyMap energySamples;
+	private MultiKeyMap coEvoEnergyStats;
 
 	private void sampleEnergy() {
 
@@ -313,24 +313,35 @@ public class MetaCompetition extends AbstractBehaviour {
 			for (Individual objective : objectives) {
 				MultiKey key = new MultiKey(controller, objective);
 				if (!energySamples.containsKey(key)) {
-					energySamples.put(controller, objective,
-							new ArrayList<Double>());
+					energySamples.put(key, new ArrayList<Double>());
+
+					coEvoEnergyStats.put(key, new DescriptiveStatistics());
 				}
 				@SuppressWarnings("unchecked")
 				ArrayList<Double> controllerSamples = (ArrayList<Double>) energySamples
 						.get(key);
+
+				DescriptiveStatistics energyStats = (DescriptiveStatistics) coEvoEnergyStats
+						.get(key);
+
 				controllerSamples.add(energy.get(objective));
+				energyStats.addValue(energy.get(objective));
 			}
 
 			// sample energy based on competition
 			if (!competitionEnergySamples.containsKey(controller)) {
 				competitionEnergySamples.put(controller,
 						new ArrayList<Double>());
+
+				compEnergyStats.put(controller, new DescriptiveStatistics());
 			}
 			ArrayList<Double> competitionSamples = (ArrayList<Double>) competitionEnergySamples
 					.get(controller);
 
+			DescriptiveStatistics copmStats = compEnergyStats.get(controller);
+
 			competitionSamples.add(competitionEnergy);
+			copmStats.addValue(competitionEnergy);
 
 			// TODO samples for actual fitness
 			// TODO samples for imitation
@@ -545,5 +556,18 @@ public class MetaCompetition extends AbstractBehaviour {
 
 	public Individual[] getObjectives() {
 		return objectiveEvo.population.subpops[0].individuals;
+	}
+
+	//return descriptive stats objects
+	
+	public DescriptiveStatistics getEnergyStats(CGPIndividual controller,
+			CGPIndividual objective) {
+		return (DescriptiveStatistics) coEvoEnergyStats.get(new MultiKey(
+				controller, objective));
+	}
+
+	public DescriptiveStatistics getCompetitionEnergyStats(
+			CGPIndividual controller) {
+		return compEnergyStats.get(controller);
 	}
 }

@@ -1,7 +1,10 @@
 package mimetic.desire.behaviour.ecj.problems.meta;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math3.util.FastMath;
 import org.apache.commons.math3.util.MathArrays;
 
@@ -46,19 +49,25 @@ public class ObjectiveEvolution extends AbstractEvoBehaviourProblem {
 	private CGPIndividual getTrainer() {
 		MetaCompetition b = (MetaCompetition) behaviour;
 
+		Map<Individual, Double> stats = new HashMap<>();
+
 		// compute the objective fitness for all the predictors
 		for (Individual controller : b.getControllers()) {
-			double meanPredictedFitness = 0.0;
+			DescriptiveStatistics predictedFitness = new DescriptiveStatistics();
 			for (Individual objective : b.getObjectives()) {
-				// meanPredictedFitness+=b.getEnergySamples(controller,
-				// objective);
-				// sum the predicted fitness
+				DescriptiveStatistics energyStats = b.getEnergyStats(
+						(CGPIndividual) controller, (CGPIndividual) objective);
+				predictedFitness.addValue(energyStats.getMean());
 			}
-			// average of predicted fitnesses
-		}
+			stats.put(controller, predictedFitness.getMean());
 
+		}
 		for (Individual objective : b.getObjectives()) {
-			// run accross all the individuals
+			for (Individual controller : b.getControllers()) {
+				DescriptiveStatistics energyStats = b.getEnergyStats(
+						(CGPIndividual) controller, (CGPIndividual) objective);
+				energyStats.getV
+			}
 		}
 
 		return null;

@@ -5,7 +5,7 @@
 parent.0 = simple.params
 
 print-params = false
-#generations = 51
+generations = 99999
 breedthreads = 1
 evalthreads = 1
 
